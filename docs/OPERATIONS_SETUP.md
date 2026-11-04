@@ -2,6 +2,8 @@
 
 2026-10-30. 코드 구현과 실제 서비스 개통을 구분합니다. 이번 작업에서는 원격 프로젝트 생성, 비용 결제, 배포, 실거래, 실사용자 OAuth를 실행하지 않았습니다.
 
+2026-11-04 추가: Supabase 원격 migration 2개·14개 테이블 적용, BE 연결·RLS 검증, FE 로컬 연결 설정을 완료했습니다. Supabase·카카오 로그인 공급자, 콜백 주소와 프로필 선택 동의 설정을 저장했고 로컬 OAuth 시작·취소 HTTP 검증이 통과했습니다. 실제 계정 로그인 E2E와 운영 배포는 아직 미완료입니다. 최신 현황은 [SUPABASE_SETUP_STATUS.md](./SUPABASE_SETUP_STATUS.md)를 따릅니다.
+
 ## 가입·생성할 서비스
 
 현재 Next.js FE/BE 구조에는 **Vercel + Supabase**를 권장합니다. 이 구성이면 AWS/GCP를 별도로 계약할 필요가 없습니다. [Supabase의 Next.js/Vercel 연결 안내](https://supabase.com/kb/faqs/database/nextjs-on-vercel)

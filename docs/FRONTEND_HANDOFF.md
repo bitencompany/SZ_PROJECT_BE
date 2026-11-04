@@ -2,6 +2,8 @@
 
 전달일: 2026-10-30. BE 저장소 `SZ_PROJECT_BE`. 사용자 결정: **PG 계약 전이므로 결제는 비활성으로 유지**.
 
+2026-11-04 설정 진행: Supabase 원격 migration 2개·14개 테이블 적용, BE 연결·RLS 검증, FE 로컬 연결 설정 완료. Supabase·카카오 로그인 공급자, 콜백 주소와 프로필 선택 동의 설정을 저장했습니다. 로컬 OAuth 시작·취소 HTTP 검증은 통과했고 실제 계정 로그인 E2E 검증은 남아 있습니다. 실제 프로젝트 주소·검증 결과·남은 작업은 [SUPABASE_SETUP_STATUS.md](./SUPABASE_SETUP_STATUS.md)를 확인하세요. 아래 표의 10월 30일 환경 준비 상태보다 해당 문서가 최신입니다.
+
 이 문서는 BE 구현 후 FE에서 진행할 작업입니다. FE 코드 자체는 이번 작업에서 변경하지 않았습니다. BE 상세 명세는 `SZ_PROJECT_BE/docs/BACKEND_API.md`, 설정 절차는 `SZ_PROJECT_BE/docs/OPERATIONS_SETUP.md`를 기준으로 합니다.
 
 ## 현재 사용할 수 있는 범위와 선행 조건
