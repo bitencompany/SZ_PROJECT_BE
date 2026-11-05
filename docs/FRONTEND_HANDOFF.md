@@ -2,6 +2,10 @@
 
 전달일: 2026-10-30. BE 저장소 `SZ_PROJECT_BE`. 사용자 결정: **PG 계약 전이므로 결제는 비활성으로 유지**.
 
+2026-11-05 SAZU 추가: 무료 테스트 검증 명령 `npm run sazu:verify`를 준비했습니다. 무료 키가 아직 없어 외부 실호출은 미검증이며, 기존 미리보기 계약은 유지합니다. [SAZU 무료 연결 절차와 FE 후속 작업](./SAZU_FREE_INTEGRATION_20261105.md)을 확인하세요.
+
+2026-11-05 추가: 한자 58개 독음·2,941개 항목의 개발용 부분 카탈로그를 Supabase에 반입했고, 실제 BE HTTP 검색·이름 계산 검증을 통과했습니다. 전체 인명용 자료·원획 독립 검수·상업 이용 조건은 미완료입니다. API 필드 변경 없이 `catalog.status=preview`를 반환합니다. [한자 연동 결과와 FE 후속 작업](./HANJA_INTEGRATION_20261105.md)을 먼저 확인하세요.
+
 2026-11-04 설정 진행: Supabase 원격 migration 2개·14개 테이블 적용, BE 연결·RLS 검증, FE 로컬 연결 설정 완료. Supabase·카카오 로그인 공급자, 콜백 주소와 프로필 선택 동의 설정을 저장했습니다. 로컬 OAuth 시작·취소 HTTP 검증은 통과했고 실제 계정 로그인 E2E 검증은 남아 있습니다. 실제 프로젝트 주소·검증 결과·남은 작업은 [SUPABASE_SETUP_STATUS.md](./SUPABASE_SETUP_STATUS.md)를 확인하세요. 아래 표의 10월 30일 환경 준비 상태보다 해당 문서가 최신입니다.
 
 이 문서는 BE 구현 후 FE에서 진행할 작업입니다. FE 코드 자체는 이번 작업에서 변경하지 않았습니다. BE 상세 명세는 `SZ_PROJECT_BE/docs/BACKEND_API.md`, 설정 절차는 `SZ_PROJECT_BE/docs/OPERATIONS_SETUP.md`를 기준으로 합니다.

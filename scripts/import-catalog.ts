@@ -23,8 +23,17 @@ try {
   await sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(301720261031)`;
     await tx`insert into private.catalogs(version,status,metadata) values(${catalog.catalog.version},${catalog.catalog.status},${tx.json(catalog.metadata)})`;
-    for (const item of catalog.entries)
-      await tx`insert into private.catalog_entries(version,id,reading,entry,evidence) values(${catalog.catalog.version},${item.entry.id},${item.entry.reading},${tx.json(item.entry)},${tx.json(item.evidence)})`;
+    for (let i = 0; i < catalog.entries.length; i += 250) {
+      const batch = catalog.entries.slice(i, i + 250).map((item) => ({
+        id: item.entry.id,
+        reading: item.entry.reading,
+        entry: item.entry,
+        evidence: item.evidence,
+      }));
+      await tx`insert into private.catalog_entries(version,id,reading,entry,evidence)
+        select ${catalog.catalog.version},x.id,x.reading,x.entry,x.evidence
+        from jsonb_to_recordset(${tx.json(batch)}::jsonb) as x(id text,reading text,entry jsonb,evidence jsonb)`;
+    }
     if (activate)
       await tx`insert into private.active_catalog(singleton,version) values(true,${catalog.catalog.version}) on conflict(singleton) do update set version=excluded.version`;
   });

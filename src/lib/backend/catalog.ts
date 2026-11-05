@@ -33,7 +33,7 @@ export const catalogImportSchema = z
     catalog: catalogSchema,
     metadata: z
       .object({
-        scope: z.literal("full-personal-name-catalog"),
+        scope: z.enum(["full-personal-name-catalog", "partial-source-preview"]),
         sourceVersion: z.string().min(1),
         license: z.string().min(1),
         reviewedAt: z.iso.date(),
@@ -49,6 +49,14 @@ export const catalogImportSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (
+      value.catalog.status === "verified" &&
+      value.metadata.scope !== "full-personal-name-catalog"
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "부분 자료는 검수 완료로 등록할 수 없습니다.",
+      });
     const ids = new Set<string>();
     const counts = new Map<string, number>();
     for (const { entry: h, evidence: e } of value.entries) {

@@ -1,5 +1,7 @@
 # Supabase DB 연결·적용 완료 및 프론트 후속 작업
 
+2026-11-05 갱신: [한자 연동 결과](./HANJA_INTEGRATION_20261105.md). 기존 빈 카탈로그 대신 58개 독음·2,941개 항목의 부분 `preview` 카탈로그를 반입·활성화했고 실제 HTTP 조회·이름 계산을 검증했습니다. 아래 11월 4일의 `CATALOG_NOT_READY` 결과는 반입 이전 이력입니다. 전체 검수·상업 이용 조건은 미완료이며 FE 운영 기능과 결제는 비활성을 유지합니다.
+
 확인일: 2026-11-04. 이 문서는 실제 프로젝트 상태를 기록합니다. API 계약과 FE 작업 목록은 [FRONTEND_HANDOFF.md](./FRONTEND_HANDOFF.md), [BACKEND_API.md](./BACKEND_API.md)를 따릅니다.
 
 ## 확인 완료
