@@ -117,6 +117,7 @@ const entries = name.hanjaIds.map((id, i) => ({
   reading: name.name[i],
   character: ["金", "書", "俊"][i],
   meaning: "테스트",
+  ...(i === 0 ? { searchAliases: ["합성 본관 김씨"], meanings: ["테스트", "보조 뜻"] } : {}),
   strokes: [8, 10, 9][i],
   dictionaryStrokes: [8, 10, 9][i],
   element: null,
@@ -274,6 +275,16 @@ afterAll(async () => {
 });
 
 describe("한자와 계산 계약", () => {
+  it("泰는 원자료 9획 대신 실제 필획 10획으로 계산하고 미확인 필획은 거절한다", async () => {
+    for (const [id, dictionaryStrokes] of [["tae", 10], ["tae-missing", null]] as const) {
+      await db.query("insert into private.catalog_entries(version,id,reading,entry,evidence) values('test-only',$1,'태',$2::jsonb,$3::jsonb)", [
+        id, JSON.stringify({ ...entries[0], id, character: "泰", reading: "태", strokes: 9, dictionaryStrokes }), JSON.stringify(evidence),
+      ]);
+    }
+    const result = await analyzeName(db, { name: "태서준", hanjaIds: ["tae", ...name.hanjaIds.slice(1)] });
+    expect(result.data.grids.map((grid) => grid.total)).toEqual([19, 20, 19, 29]);
+    await expect(analyzeName(db, { name: "태서준", hanjaIds: ["tae-missing", ...name.hanjaIds.slice(1)] })).rejects.toMatchObject({ code: "WRITTEN_STROKES_UNAVAILABLE" });
+  });
   it("원형이정 19/18/17/27, FE 응답 스키마, 방향을 보존한다", async () => {
     const result = await analyzeName(db, name);
     expect(result.data.grids.map((g) => g.total)).toEqual([19, 18, 17, 27]);
@@ -295,6 +306,16 @@ describe("한자와 계산 계약", () => {
     ).rejects.toMatchObject({ code: "HANJA_MISMATCH" });
     expect((await findHanja(db, "태", "")).data).toEqual([]);
     expect((await findHanja(db, "김", "金")).data).toHaveLength(1);
+    expect((await findHanja(db, "김", "테스트 김")).data).toHaveLength(1);
+    expect((await findHanja(db, "김", "보조뜻김")).data).toHaveLength(1);
+    expect((await findHanja(db, "서", "보조뜻김")).data).toHaveLength(0);
+    for (const query of ["합성 본관 김", "합성본관김", "합성 본관 김씨"]) {
+      const result = await findHanja(db, "김", query);
+      expect(result.data.map((item) => item.character)).toEqual(["金"]);
+      expect(result.data[0].searchAliases).toEqual(["합성 본관 김씨"]);
+    }
+    expect((await findHanja(db, "서", "합성본관김")).data).toEqual([]);
+    expect((await findHanja(db, "김", "없는 뜻")).data).toHaveLength(0);
   });
   it("검수 표시만으로는 출처 없는 원획을 import할 수 없다", () => {
     expect(
@@ -401,6 +422,26 @@ describe("입력/소유권/보관", () => {
   });
 });
 describe("미리보기와 호출 비용", () => {
+  it("문자열로 이중 직렬화된 캐시는 재사용하거나 연결하지 않고 정상 객체로 교체한다", async () => {
+    const analyze = vi.fn(async () => ({
+      source: "SAZU" as const,
+      sandbox: true,
+      modules,
+    }));
+    const first = await createPreview(db, birth, analyze);
+    await db.query(
+      "update private.previews set result=to_jsonb(result::text) where id=$1",
+      [first.id],
+    );
+    expect(await matchingPreview(db, first.id, birth)).toBeUndefined();
+    const repaired = await createPreview(db, birth, analyze);
+    expect(repaired.id).not.toBe(first.id);
+    expect(repaired.result.source).toBe("SAZU");
+    expect(repaired.result.sandbox).toBe(true);
+    expect(analyze).toHaveBeenCalledTimes(2);
+    expect((await createPreview(db, birth, analyze)).id).toBe(repaired.id);
+    expect(analyze).toHaveBeenCalledTimes(2);
+  });
   it("시간 미상/선택 필드/무료 필드를 보존하고 동일 입력을 재사용한다", async () => {
     const analyze = vi.fn(async () => ({
       source: "SAZU" as const,
@@ -806,5 +847,57 @@ describe("운영 경계 회귀", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "PAYMENT_NOT_READY" },
     });
+  });
+});
+
+describe("확장 미리보기 계약", () => {
+  it("시각 미상은 시주와 전체 명식 기반 모듈 및 원자료를 내보내지 않는다", () => {
+    const output = previewFields(
+      {
+        source: "SAZU",
+        sandbox: true,
+        modules: {
+          ...modules,
+          sinStrength: { strength: "신강" },
+          wongukInteraction: { relations: [] },
+        },
+        providerData: {
+          topics: ["manse"],
+          modules: { hiddenHour: "must-not-leak" },
+          glossary: {},
+        },
+      },
+      { ...birth, birthHour: null },
+    );
+    expect(output.modules.fourPillars.hour).toBeNull();
+    expect(Object.keys(output.modules)).toEqual(["fourPillars"]);
+    expect(output.providerData).toBeUndefined();
+  });
+  it("이전 계약의 캐시를 재사용하지 않고 확장 응답을 새로 저장한다", async () => {
+    const analyze = vi.fn(async () => ({
+      source: "SAZU" as const,
+      sandbox: true,
+      modules,
+    }));
+    const first = await createPreview(db, birth, analyze);
+    await db.query(
+      "update private.previews set provider_version='old-v1' where id=$1",
+      [first.id],
+    );
+    expect(await matchingPreview(db, first.id, birth)).toBeUndefined();
+    const next = await createPreview(db, birth, analyze);
+    expect(next.id).not.toBe(first.id);
+    expect(analyze).toHaveBeenCalledTimes(2);
+  });
+  it("시각이 있는 확장 요청은 공급자 호출 2회분을 예약한다", async () => {
+    await createPreview(db, { ...birth, birthHour: 10 }, async () => ({
+      source: "SAZU",
+      sandbox: true,
+      modules,
+    }));
+    const [usage] = await db.query<{ count: number }>(
+      "select count from private.usage_limits where key='sazu-provider-daily'",
+    );
+    expect(usage.count).toBe(2);
   });
 });

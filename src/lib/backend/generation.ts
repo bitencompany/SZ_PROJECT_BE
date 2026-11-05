@@ -159,7 +159,7 @@ export async function runGeneration(
       )
         return;
       await tx.query(
-        `insert into public.readings(user_id,order_id,subject_name,content,provenance) values($1,$2,$3,$4::jsonb,$5::jsonb) on conflict(order_id) do nothing`,
+        `insert into public.readings(user_id,order_id,subject_name,content,provenance) values($1,$2,$3,$4::text::jsonb,$5::text::jsonb) on conflict(order_id) do nothing`,
         [
           order.user_id,
           job.order_id,

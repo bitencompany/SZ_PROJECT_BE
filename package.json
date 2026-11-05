@@ -11,8 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:connect": "node --env-file-if-exists=.env.local scripts/connect-db.mjs",
-    "catalog:fetch": "node --conditions=react-server --import tsx scripts/fetch-hanja.ts",
-    "catalog:verify": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/verify-hanja.ts",
+    "catalog:fetch": "node scripts/fetch-hanja-v2.mjs",
+    "catalog:fetch:legacy": "node --conditions=react-server --import tsx scripts/fetch-hanja.ts",
+    "catalog:build": "python3 scripts/prepare-hanja-v2.py .local/hanja-replacement/Unihan.zip && node --conditions=react-server --import tsx scripts/build-hanja-v2.ts",
+    "catalog:verify": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/verify-hanja-v2.ts",
+    "catalog:verify:legacy": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/verify-hanja.ts",
     "sazu:verify": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/verify-sazu.ts",
     "db:migrate": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/migrate.ts",
     "catalog:import": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/import-catalog.ts"

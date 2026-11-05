@@ -25,7 +25,7 @@ async function request(path: string, body?: unknown, authenticated = true) {
 try {
   assert(secret, "BFF secret must be configured");
   const catalog = catalogImportSchema.parse(
-    JSON.parse(await readFile(".local/hanja/catalog.json", "utf8")),
+    JSON.parse(await readFile(process.argv[2] ?? ".local/hanja/catalog.json", "utf8")),
   );
   const readings = [...new Set(catalog.entries.map((i) => i.entry.reading))];
   let count = 0;

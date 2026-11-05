@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  detailedPillarSchema,
+  detailModulesShape,
+  type ProviderData,
+} from "./details";
 
 export function todayInSeoul(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -58,15 +63,7 @@ export const birthSchema = z
 
 export type BirthInput = z.infer<typeof birthSchema>;
 
-const pillarSchema = z.object({
-  full: z.string().min(1),
-  sky: z.string().optional(),
-  earth: z.string().optional(),
-  skyElement: z.string().optional(),
-  earthElement: z.string().optional(),
-  sippiSeong: z.string().optional(),
-  twelveStage: z.string().optional(),
-});
+const pillarSchema = detailedPillarSchema;
 
 // 외부 응답은 런타임에서도 검증하고, UI에서 사용하는 항목만 반환합니다.
 export const modulesSchema = z.object({
@@ -85,20 +82,13 @@ export const modulesSchema = z.object({
       }),
     )
     .optional(),
-  sinStrength: z
-    .object({ strength: z.string(), analysis: z.string().optional() })
-    .optional(),
-  decadeFortune: z
-    .object({
-      direction: z.string(),
-      list: z.array(z.object({ startAge: z.number(), full: z.string() })),
-    })
-    .optional(),
+  ...detailModulesShape,
 });
 
 export type AnalysisModules = z.infer<typeof modulesSchema>;
 export interface AnalysisResult {
   modules: AnalysisModules;
+  providerData?: ProviderData;
   source: "SAZU";
   sandbox: boolean;
 }

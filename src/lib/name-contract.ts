@@ -6,6 +6,12 @@ export const hanjaSchema = z.object({
   reading: z.string().regex(/^[가-힣]$/),
   character: z.string().min(1).max(4),
   meaning: z.string().min(1).max(100),
+  meanings: z.array(z.string().min(1).max(100)).max(100).optional(),
+  meaningStatus: z.enum(["sourced", "unavailable"]).optional(),
+  meaningSource: z.url().startsWith("https://").nullable().optional(),
+  readingSource: z.url().startsWith("https://").optional(),
+  strokeBasis: z.literal("written").optional(),
+  searchAliases: z.array(z.string().min(1).max(100)).max(100).optional(),
   strokes: z.number().int().positive().max(100),
   element: element.nullable(),
   isBulyong: z.boolean().nullable(),
@@ -20,6 +26,13 @@ export const hanjaSchema = z.object({
       }),
     )
     .max(10),
+}).superRefine((item, ctx) => {
+  if (item.strokeBasis === "written" && (item.dictionaryStrokes === null || item.strokes !== item.dictionaryStrokes))
+    ctx.addIssue({ code: "custom", message: "Written stroke values must agree" });
+  if (item.meaningStatus === "sourced" && (!item.meanings?.length || !item.meaningSource || item.meaning !== item.meanings[0]))
+    ctx.addIssue({ code: "custom", message: "Sourced meaning requires matching primary gloss and source" });
+  if (item.meaningStatus === "unavailable" && (item.meaning !== "뜻 확인 중" || item.meanings?.length !== 0 || item.meaningSource !== null))
+    ctx.addIssue({ code: "custom", message: "Unavailable meaning must not contain inferred glosses" });
 });
 export const catalogSchema = z.object({
   status: z.enum(["preview", "verified"]),

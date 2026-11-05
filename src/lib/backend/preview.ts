@@ -6,7 +6,7 @@ import { lock } from "./db";
 import { digest } from "./security";
 import { consume, positiveSetting } from "./limits";
 import { fail } from "./http";
-export const SAZU_VERSION = "sazu-v2-manse-standard/sdk-0.10.1/preview-v1";
+export const SAZU_VERSION = "sazu-v2-manse-life-standard/sdk-0.10.1/preview-v2";
 export interface Preview {
   id: string;
   result: AnalysisResult;
@@ -19,28 +19,31 @@ export function previewFields(
 ): AnalysisResult {
   const modules = modulesSchema.parse(result.modules);
   return {
+    ...(birth.birthHour !== null && result.providerData
+      ? { providerData: result.providerData }
+      : {}),
     source: "SAZU",
     sandbox: result.sandbox,
     modules: {
+      ...(birth.birthHour !== null ? modules : {}),
       fourPillars: {
         ...modules.fourPillars,
         ...(birth.birthHour === null ? { hour: null } : {}),
       },
-      ...(modules.elements ? { elements: modules.elements } : {}),
     },
   };
 }
 export async function createPreview(
   db: Database,
   birth: BirthInput,
-  analyze = analyzeBirth,
+  analyze = (input: BirthInput) => analyzeBirth(input, true),
 ): Promise<Preview> {
   if (process.env.PREVIEW_ENABLED !== "true")
     fail(503, "PREVIEW_NOT_READY", "사주 미리보기를 준비하고 있어요.");
   const hash = digest("birth-v1", birth);
   const [existing] = await db.query<Preview>(
-    "select * from private.previews where input_hash=$1 and expires_at>now()",
-    [hash],
+    "select * from private.previews where input_hash=$1 and expires_at>now() and jsonb_typeof(result)='object' and provider_version=$2",
+    [hash, SAZU_VERSION],
   );
   if (existing) return existing;
   // 잠금을 기다리는 동안 다른 연결을 추가 요구하지 않습니다. 캐시 미스는 먼저 예산을
@@ -52,18 +55,27 @@ export async function createPreview(
     positiveSetting("SAZU_DAILY_CALL_BUDGET", 100),
     86400,
   );
+  // The expanded preview makes two provider calls (manse + life).
+  if (birth.birthHour !== null)
+    await consume(
+      db,
+      "sazu-provider-daily",
+      positiveSetting("SAZU_DAILY_CALL_BUDGET", 100),
+      86400,
+    );
   // 공유 DB 잠금이므로 여러 서버 인스턴스에서도 같은 입력을 한 번만 계산합니다.
   return db.transaction(async (tx) => {
     await lock(tx, `preview:${hash}`);
     const [cached] = await tx.query<Preview>(
-      "select * from private.previews where input_hash=$1 and expires_at > now()",
-      [hash],
+      "select * from private.previews where input_hash=$1 and expires_at > now() and jsonb_typeof(result)='object' and provider_version=$2",
+      [hash, SAZU_VERSION],
     );
     if (cached) return cached;
     const result = previewFields(await analyze(birth), birth);
     const [preview] = await tx.query<Preview>(
+      // Serialized JSON must bind as text: postgres v4 otherwise serializes it a second time.
       `insert into private.previews(input_hash,result,provider_version,expires_at)
-      values($1,$2::jsonb,$3,now()+interval '30 minutes')
+      values($1,$2::text::jsonb,$3,now()+interval '30 minutes')
       on conflict(input_hash) do update set id=gen_random_uuid(),result=excluded.result,provider_version=excluded.provider_version,expires_at=excluded.expires_at
       returning *`,
       [hash, JSON.stringify(result), SAZU_VERSION],
@@ -78,8 +90,8 @@ export async function matchingPreview(
 ): Promise<Preview | undefined> {
   if (!previewId) return undefined;
   const [row] = await db.query<Preview>(
-    "select * from private.previews where id=$1 and input_hash=$2 and expires_at>now()",
-    [previewId, digest("birth-v1", birth)],
+    "select * from private.previews where id=$1 and input_hash=$2 and expires_at>now() and jsonb_typeof(result)='object' and provider_version=$3",
+    [previewId, digest("birth-v1", birth), SAZU_VERSION],
   );
   return row;
 }

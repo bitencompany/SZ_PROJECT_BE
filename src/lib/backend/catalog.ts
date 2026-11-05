@@ -90,8 +90,18 @@ export async function activeCatalog(db: Queryable) {
 export async function findHanja(db: Queryable, reading: string, q: string) {
   const catalog = await activeCatalog(db);
   const rows = await db.query<{ entry: Hanja }>(
-    `select entry from private.catalog_entries where version=$1 and reading=$2 and ($3='' or strpos(entry->>'meaning',$3)>0 or strpos(entry->>'character',$3)>0) order by id limit 2001`,
-    [catalog.version, reading, q],
+    `select entry from private.catalog_entries where version=$1 and reading=$2 and (
+      $3='' or strpos(regexp_replace((entry->>'character')||(entry->>'meaning')||reading,'[[:space:]]','','g'),$3)>0
+      or exists (
+        select 1 from jsonb_array_elements_text(coalesce(entry->'searchAliases','[]'::jsonb)) as alias(value)
+        where strpos(regexp_replace(alias.value,'[[:space:]]','','g'),$3)>0
+      )
+      or exists (
+        select 1 from jsonb_array_elements_text(coalesce(entry->'meanings','[]'::jsonb)) as gloss(value)
+        where strpos(regexp_replace(gloss.value||reading,'[[:space:]]','','g'),$3)>0
+      )
+    ) order by case when entry->>'meaningStatus'='unavailable' then 1 else 0 end,id limit 2001`,
+    [catalog.version, reading, q.replace(/\s/gu, "")],
   );
   if (rows.length > 2000) fail(503, "CATALOG_CONTRACT_EXCEEDED");
   return { data: rows.map((r) => hanjaSchema.parse(r.entry)), catalog };
@@ -156,11 +166,15 @@ export async function analyzeName(
     hanja.some(
       (h) =>
         h.strokeReview !== "reference-checked" ||
-        !h.strokeSources.some((s) => s.basis === "naming-original"),
+        !h.strokeSources.some((s) => s.basis === "dictionary"),
     )
   )
     fail(409, "UNVERIFIED_CATALOG");
-  const [s, a, b] = hanja.map((h) => h.strokes);
+  const [s, a, b] = hanja.map((h) => {
+    if (h.dictionaryStrokes === null)
+      fail(409, "WRITTEN_STROKES_UNAVAILABLE", "실제 획수가 확인되지 않은 한자가 있어 수리를 계산할 수 없어요.");
+    return h.dictionaryStrokes;
+  });
   const grids = [
     ["원격", "초년운", a + b],
     ["형격", "청년운", s + a],

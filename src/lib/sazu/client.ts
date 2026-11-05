@@ -1,4 +1,6 @@
 import "server-only";
+import { providerDataSchema } from "./details";
+import { z } from "zod";
 import { SazuApiError, SazuClient } from "@sazuapp/client";
 import {
   dateKey,
@@ -18,7 +20,10 @@ export class AnalysisError extends Error {
   }
 }
 
-export async function analyzeBirth(birth: BirthInput): Promise<AnalysisResult> {
+export async function analyzeBirth(
+  birth: BirthInput,
+  includeDetails = false,
+): Promise<AnalysisResult> {
   const apiKey: string | undefined = process.env.SAZU_API_KEY?.trim();
   if (!apiKey)
     throw new AnalysisError(
@@ -60,12 +65,41 @@ export async function analyzeBirth(birth: BirthInput): Promise<AnalysisResult> {
           "생년월일은 오늘 이전 날짜로 입력해 주세요.",
         );
     }
-    const reading = await client.readings.manse({
+    const input = {
       ...birth,
-      locale: "ko",
-      detail: "standard",
+      locale: "ko" as const,
+      detail: "standard" as const,
+    };
+    const [reading, life] = await Promise.all([
+      client.readings.manse(input),
+      includeDetails && birth.birthHour !== null
+        ? client.readings.life(input)
+        : Promise.resolve(null),
+    ]);
+    // Both topics must describe the same chart before their facts can be combined.
+    const base = modulesSchema.safeParse(reading.modules);
+    const lifeChart = life ? modulesSchema.safeParse(life.modules) : null;
+    if (
+      life &&
+      (!lifeChart?.success ||
+        !base.success ||
+        ["year", "month", "day", "hour"].some((key) => {
+          const k = key as keyof typeof base.data.fourPillars;
+          return (
+            base.data.fourPillars[k]?.full !==
+            lifeChart.data.fourPillars[k]?.full
+          );
+        }))
+    )
+      throw new AnalysisError(
+        502,
+        "INVALID_RESPONSE",
+        "사주 자료가 서로 일치하지 않아 다시 확인이 필요해요.",
+      );
+    const parsed = modulesSchema.safeParse({
+      ...life?.modules,
+      ...reading.modules,
     });
-    const parsed = modulesSchema.safeParse(reading.modules);
     if (!parsed.success)
       throw new AnalysisError(
         502,
@@ -74,6 +108,28 @@ export async function analyzeBirth(birth: BirthInput): Promise<AnalysisResult> {
       );
     return {
       modules: parsed.data,
+      ...(includeDetails && birth.birthHour !== null
+        ? {
+            providerData: providerDataSchema.parse({
+              topics: ["manse", ...(life ? ["life"] : [])],
+              modules: { ...life?.modules, ...reading.modules },
+              glossary: {
+                ...z
+                  .object({
+                    glossary: z.record(z.string(), z.string()).optional(),
+                  })
+                  .parse(reading).glossary,
+                ...(life
+                  ? z
+                      .object({
+                        glossary: z.record(z.string(), z.string()).optional(),
+                      })
+                      .parse(life).glossary
+                  : {}),
+              },
+            }),
+          }
+        : {}),
       source: "SAZU",
       sandbox: apiKey.startsWith("sazu_free_"),
     };

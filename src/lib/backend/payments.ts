@@ -167,7 +167,7 @@ export async function createOrder(
         ],
       );
       await tx.query(
-        "insert into private.order_snapshots(order_id,snapshot) values($1,$2::jsonb)",
+        "insert into private.order_snapshots(order_id,snapshot) values($1,$2::text::jsonb)",
         [created.id, JSON.stringify(snapshot)],
       );
       return created;

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { analyzeBirth, AnalysisError } from "../src/lib/sazu/client";
 import { birthSchema, modulesSchema } from "../src/lib/sazu/schema";
 import { previewFields, SAZU_VERSION } from "../src/lib/backend/preview";
+import { providerDataSchema } from "../src/lib/sazu/details";
 
 // Never send the BFF secret to a user-supplied host or follow redirects.
 const origin = "http://127.0.0.1:3017";
@@ -35,12 +36,13 @@ const resultSchema = z.object({
     source: z.literal("SAZU"),
     sandbox: z.literal(true),
     modules: modulesSchema,
+    providerData: providerDataSchema,
     previewId: z.uuid(),
     expiresAt: z.iso.datetime(),
     providerVersion: z.string(),
   }),
 });
-async function request(birth: unknown, authenticated = true) {
+async function request(birth: unknown, authenticated = true, consent = true) {
   return fetch(`${origin}/api/sazu/preview`, {
     method: "POST",
     redirect: "error",
@@ -53,7 +55,7 @@ async function request(birth: unknown, authenticated = true) {
         ? { "x-bff-secret": process.env.BFF_SHARED_SECRET! }
         : {}),
     },
-    body: JSON.stringify({ birth }),
+    body: JSON.stringify({ birth, consent }),
   });
 }
 
@@ -82,7 +84,7 @@ try {
   );
   assert(sample, "공급자의 양력·시간 명시 샘플을 찾지 못했습니다.");
   const birth = sample.input;
-  const direct = previewFields(await analyzeBirth(birth), birth);
+  const direct = previewFields(await analyzeBirth(birth, true), birth);
   assert.equal(direct.sandbox, true);
   const first = await request(birth);
   assert.equal(
@@ -93,6 +95,7 @@ try {
   assert.equal(first.headers.get("cache-control"), "no-store, private");
   const result = resultSchema.parse(await first.json()).data;
   assert.deepEqual(result.modules, direct.modules);
+  assert.deepEqual(result.providerData, direct.providerData);
   assert.equal(result.providerVersion, SAZU_VERSION);
   assert(
     Date.parse(result.expiresAt) > Date.now(),
@@ -106,6 +109,7 @@ try {
   assert.equal(second.status, 200);
   assert.deepEqual(resultSchema.parse(await second.json()).data, result);
   assert.equal((await request(birth, false)).status, 403);
+  assert.equal((await request(birth, true, false)).status, 400);
   assert.equal((await request({ ...birth, birthHour: 24 })).status, 400);
   const report = {
     checkedAt: new Date().toISOString(),
@@ -125,6 +129,7 @@ try {
       "sandbox=true",
       "DB 캐시 재사용: 동일 previewId/만료/결과",
       "BFF 누락 403",
+      "동의 거부 400",
       "잘못된 출생시간 400",
     ],
     limitations: [
@@ -150,7 +155,7 @@ try {
         : error instanceof assert.AssertionError
           ? error.message
           : error instanceof z.ZodError
-            ? "SAZU 응답이 현재 계약과 다릅니다. 스키마 확인이 필요합니다."
+            ? `SAZU 응답 계약 불일치: ${error.issues.map((issue) => `${issue.path.join(".")} (${issue.code})`).join(", ")}`
             : "네트워크/서버 오류: 로컬 서버와 연결 상태를 확인하세요.";
   console.error("SAZU 무료 연동 검증 실패:", message);
   process.exitCode = 1;

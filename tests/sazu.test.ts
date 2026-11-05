@@ -245,3 +245,75 @@ describe("POST /api/sazu 경계", (): void => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+describe("확장 원국 데이터", () => {
+  it("manse와 life를 병합하고 사용하지 않는 공급자 필드까지 원자료에 보존한다", async () => {
+    const chart = {
+      ...modules,
+      fourPillars: {
+        ...modules.fourPillars,
+        hour: { full: "계사", sky: "계", earth: "사" },
+      },
+    };
+    const life = {
+      fourPillars: chart.fourPillars,
+      wongukInteraction: {
+        relations: [
+          {
+            type: "천간합",
+            source: "무",
+            target: "계",
+            sourcePosition: "년주",
+            targetPosition: "시주",
+            meaning: "provider-only meaning",
+          },
+        ],
+      },
+      evaluation: {
+        personality: { keywords: ["독립적"] },
+        futureExtra: { preserved: true },
+      },
+    };
+    mockFetch.mockImplementation(async (url) =>
+      successResponse({
+        modules: String(url).endsWith("/life") ? life : chart,
+        glossary: { 비견: "term explanation" },
+        input: { privateInput: "not-forwarded" },
+      }),
+    );
+    const result = await analyzeBirth(birth, true);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result.modules.wongukInteraction?.relations).toHaveLength(1);
+    expect(result.modules.wongukInteraction?.relations[0]).not.toHaveProperty(
+      "meaning",
+    );
+    expect(result.providerData?.modules.evaluation).toHaveProperty(
+      "futureExtra.preserved",
+      true,
+    );
+    expect(result.providerData?.glossary.비견).toBe("term explanation");
+    expect(JSON.stringify(result)).not.toContain("privateInput");
+  });
+  it("두 토픽이 다른 명식을 반환하면 조합을 섞지 않는다", async () => {
+    mockFetch.mockImplementation(async (url) =>
+      successResponse({
+        modules: {
+          ...modules,
+          fourPillars: {
+            ...modules.fourPillars,
+            day: { full: String(url).endsWith("/life") ? "다른일주" : "일주" },
+          },
+        },
+      }),
+    );
+    await expect(analyzeBirth(birth, true)).rejects.toMatchObject({
+      code: "INVALID_RESPONSE",
+    });
+  });
+  it("시간 미상은 life를 호출하지 않는다", async () => {
+    mockFetch.mockResolvedValue(successResponse({ modules }));
+    const result = await analyzeBirth({ ...birth, birthHour: null }, true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.providerData).toBeUndefined();
+  });
+});

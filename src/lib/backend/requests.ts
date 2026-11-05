@@ -56,7 +56,7 @@ export async function saveRequest(
       ? await matchingPreview(tx, value.previewId, toBirth(input.birth))
       : undefined;
     await tx.query(
-      `insert into public.reading_requests(id,user_id,input,catalog_status,catalog_version,consent_version) values($1,$2,$3::jsonb,$4,$5,'save-v1-2026-10-30')`,
+      `insert into public.reading_requests(id,user_id,input,catalog_status,catalog_version,consent_version) values($1,$2,$3::text::jsonb,$4,$5,'save-v1-2026-10-30')`,
       [
         value.requestId,
         userId,
