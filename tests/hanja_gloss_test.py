@@ -14,5 +14,15 @@ class HanjaGlossTest(unittest.TestCase):
         self.assertEqual(parse_glosses('많을 은, 검붉을 안', '은'), ['많을'])
         self.assertEqual(parse_glosses('', '태'), [])
 
+    def test_indexed_bare_korean_gloss(self):
+        self.assertEqual(parse_glosses('강할', '강'), ['강할'])
+        self.assertEqual(parse_glosses('조나라 서울', '감'), ['조나라 서울'])
+        self.assertEqual(parse_glosses('끝', '말'), ['끝'])
+
+    def test_bare_gloss_does_not_inherit_another_reading_or_variant(self):
+        self.assertEqual(parse_glosses('검붉을 안', '은'), [])
+        self.assertEqual(parse_glosses('歌와 同字', '가'), [])
+        self.assertEqual(parse_glosses('밝을 명, malformed', '은'), [])
+
 if __name__ == '__main__':
     unittest.main()

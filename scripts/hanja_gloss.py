@@ -22,4 +22,11 @@ def parse_glosses(raw, reading):
         match = re.fullmatch(r'(.+?)\s+([가-힣])', gloss.strip())
         if match and same_reading(match[2], reading) and match[1] not in meanings:
             meanings.append(match[1])
+    # Some explicitly indexed rows omit the reading suffix (강:強:강할).
+    # Accept a whole Korean gloss only, never cross-references or a rejected
+    # meaning+reading pair. Comma-separated mixed readings stay isolated above.
+    bare = raw.strip()
+    if (not meanings and re.fullmatch(r'[가-힣]+(?:\s+[가-힣]+)*', bare)
+            and not re.fullmatch(r'(.+?)\s+([가-힣])', bare)):
+        meanings.append(bare)
     return meanings

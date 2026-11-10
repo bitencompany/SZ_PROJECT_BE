@@ -11,6 +11,8 @@ await writeFile(`${root}/migration-report.json`, JSON.stringify(report, null, 2)
 console.log(JSON.stringify({ ...report, changedMeanings: report.changedMeanings.length }));
 
 // Keep the offline FE examples on the same dictionary pipeline; their IDs stay stable.
+// BE-only verification must not write into a separately edited FE checkout.
+if (!process.argv.includes("--skip-fe")) {
 const examples: { reading: string; character: string }[] = JSON.parse(await readFile("../SZ_PROJECT_FE/src/data/hanja-example-ids.json", "utf8"));
 const seed = examples.map(({ reading, character }) => {
   const entry = catalog.entries.find(({ entry }) => entry.reading === reading && entry.character === character)?.entry;
@@ -20,3 +22,4 @@ const seed = examples.map(({ reading, character }) => {
 await writeFile("../SZ_PROJECT_FE/src/data/hanja-examples.json", JSON.stringify(seed, null, 2) + "\n");
 for (const name of ["LIBHANGUL-DATA-LICENSE.txt", "COURT-SNAPSHOT-LICENSE.txt"])
   await writeFile(`../SZ_PROJECT_FE/src/data/${name}`, await readFile(`src/data/${name}`));
+}
